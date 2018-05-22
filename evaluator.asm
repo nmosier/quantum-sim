@@ -60,8 +60,8 @@ eval_get_input:
 	bcall(_CursorOn)
 
 eval_get_input_loop:
-	bcall(_GetCSC)
-	ld de,input_JT
+	bcall(_GetKey)
+	ld de,input_JT2
 	ld h,0
 	ld l,a
 	add hl,hl
@@ -112,7 +112,73 @@ input_JT:
 	fill_word($38-$36-1, eval_handle_none)
 	.dw eval_handle_del		;$38 DEL
 	
+; uses GetKey codes, not GetCSC
+input_JT2:
+	.dw eval_handle_none	;$00
+	.dw eval_handle_arrow	;$01
+	.dw eval_handle_arrow	;$02
+	.dw eval_handle_arrow	;$03
+	.dw eval_handle_arrow	;$04
+	.dw eval_handle_enter	;$05
+	fill_word($09-$05-1, eval_handle_none)
+	.dw eval_handle_clear	;$09
+	.dw eval_handle_del		;$0A
+	fill_word($0B-$0A-1, eval_handle_none)
+	.dw eval_handle_insert	;$0B
+	.dw eval_handle_none	;$0C
+	.dw eval_handle_none	;$0D
+	.dw eval_handle_none	;$0E
+	.dw eval_handle_none	;$0F
+	fill_word($2E-$0F-1, eval_handle_none)
+	.dw eval_handle_none	;$2E
+	.dw eval_handle_none	;$2F
+	fill_word($31-$2F-1, eval_handle_none)
+	.dw eval_handle_none	;$31
+	.dw eval_handle_none	;$32
+	fill_word($35-$32-1, eval_handle_none)
+	.dw eval_handle_none	;$35
+	fill_word($44-$35-1, eval_handle_none)
+	.dw eval_handle_none	;$44
+	.dw eval_handle_none	;$45
+	fill_word($48-$45-1, eval_handle_none)
+	.dw eval_handle_none	;$48
+	.dw eval_handle_none	;$49
+	fill_word($5A-$49-1, eval_handle_none)
+	.dw eval_handle_none	;$5A
+	fill_word($80-$5A-1, eval_handle_none)
+	.dw eval_handle_char	;$80 +
+	.dw eval_handle_char	;$81 -
+	.dw eval_handle_char	;$82 *
+	.dw eval_handle_char	;$83 /
+	fill_word($85-$83-1, eval_handle_none)
+	.dw eval_handle_char	;$85 (
+	.dw eval_handle_char	;$86 )	
+	fill_word($8A-$86-1, eval_handle_none)
+	.dw eval_handle_none	;$8A
+	.dw eval_handle_none	;$8B
+	fill_word($97-$8C+1, eval_handle_char)
+	fill_word($B4-$97-1, eval_handle_none)
+	.dw eval_handle_none	;$B4
+	fill_word($B7-$B4-1, eval_handle_none)
+	.dw eval_handle_none	;$B7
+	fill_word($B9-$B7-1, eval_handle_none)
+	.dw eval_handle_none	;$B9
+	fill_word($BB-$B9-1, eval_handle_none)
+	.dw eval_handle_none	;$BB
+	fill_word($BD-$BB-1, eval_handle_none)
+	.dw eval_handle_none	;$BD
+	.dw eval_handle_none	;$BF
+	fill_word($C1-$BF-1, eval_handle_none)
+	.dw eval_handle_none	;$C1
+	fill_word($FB-$C1, eval_handle_none)
+
+
+
+
+
 	
+
+
 eval_handle_none:
 	ret
 
@@ -120,13 +186,13 @@ eval_handle_arrow:
 	bcall(_CursorOff)
 	ld hl,_
 	push hl	; return to end of fn
-	cp skLeft
+	cp kLeft
 	jr z,eval_move_cursor_left
-	cp skRight
+	cp kRight
 	jr z,eval_move_cursor_right
-	cp skDown
+	cp kDown
 	jp z,eval_move_cursor_down
-	cp skUp
+	cp kUp
 	jp z,eval_move_cursor_up
 _	bcall(_CursorOn)
 	ret
@@ -227,6 +293,7 @@ eval_handle_enter:
 	pop de
 	ret
 
+eval_handle_insert:
 eval_handle_2nd:
 	ld a,(iy+textFlags)
 	xor 1<<textInsMode
@@ -235,7 +302,7 @@ eval_handle_2nd:
 
 eval_handle_char:
 	; a = CSC scan code
-	ld hl,eval_CSC2char_LUT
+	ld hl,eval_k2char_LUT
 	ld d,0
 	ld e,a
 	add hl,de
@@ -312,26 +379,29 @@ eval_handle_clear:
 eval_handle_braket:
 	ret
 
-eval_CSC2char_LUT:
-	.fill $0A-$00,'?'
-	.db '+'	; $0A
-	.db '-' ; $0B
-	.fill $11-$0B-1,'?'
-	.db $1A ; $11
-	.db '3' ; $12
-	.db '6' ; $13
-	.db '9' ; $14
-	.fill $19-$14-1,'?'
-	.db '.' ; $19
-	.db '2' ; $1A
-	.db '5' ; $1B
-	.db '8' ; $1C
-	.fill $21-$1C-1,'?'
-	.db '0' ; $21
-	.db '1' ; $22
-	.db '4' ; $23
-	.db '7' ; $24
-	.fill $38-$24,'?'
+eval_k2char_LUT:
+	.fill $80,'?'	;$00-$80
+	.db '+'			;$80
+	.db '-'			;$81
+	.db '*'			;$82
+	.db '/'			;$83
+	.db '?'			;$84
+	.db '('			;$85
+	.db ')'			;$86
+	.fill $8C-$86-1,'?'
+	.db '-'			;$8C
+	.db '.'			;$8D
+	.db '0'			;$8E
+	.db '1'			;$8F
+	.db '2'			;$90
+	.db '3'			;$91
+	.db '4'			;$92
+	.db '5'			;$93
+	.db '6'			;$94
+	.db '7'			;$95
+	.db '8'			;$96
+	.db '9'			;$97
+	.fill $FB-$97,'?'
 
 eval_overwrite_char:
 	; INPUT: a = char to put

@@ -82,7 +82,7 @@
 		<string>ti83plus.inc</string>
 	</array>
 	<key>ProjectSelectedTextFileName</key>
-	<string>quantum_sim.asm</string>
+	<string>evaluator.asm</string>
 	<key>ProjectSymbolsTableViewAutosaveDictionary</key>
 	<dict>
 		<key>Icon</key>
