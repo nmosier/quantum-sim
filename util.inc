@@ -59,3 +59,21 @@ cursor_adjust:
 	and h
 	ld h,a
 	ret
+
+display_toks:
+	;; input:	hl = ptr to beginning of tok array
+	;; 			bc = # of toks to display
+	;; destroys:
+	push hl
+	push bc
+	ld a,(hl)
+	call tok2titok
+	bcall(_PutTokString)
+	pop bc
+	pop hl
+	inc hl
+	dec bc
+	ld a,b
+	or c
+	jr nz,display_toks
+	ret

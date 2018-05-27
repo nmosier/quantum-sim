@@ -5,6 +5,7 @@
 
 #include "ti83plus.inc"
 #include "app.inc"
+#include "macros.inc"
 
 defpage(0)
 

@@ -70,17 +70,18 @@
 		<string>3</string>
 	</array>
 	<key>ProjectGroupsOutlineViewSelectedItemIndexPaths</key>
-	<array/>
+	<array>
+		<string>0,0</string>
+	</array>
 	<key>ProjectGroupsOutlineViewWidth</key>
 	<real>125</real>
 	<key>ProjectOpenTextFileNames</key>
 	<array>
 		<string>quantum_sim.asm</string>
-		<string>app.inc</string>
 		<string>evaluator.asm</string>
 		<string>util.inc</string>
-		<string>ti83plus.inc</string>
 		<string>tables.asm</string>
+		<string>macros.inc</string>
 	</array>
 	<key>ProjectSelectedTextFileName</key>
 	<string>evaluator.asm</string>

@@ -117,41 +117,98 @@ _
 eval_move_cursor_down:
 	ld a,(curRow)
 	cp 7
-	call z,eval_scroll_down
-	ld a,(curRow)
-	cp 7
-	ret z
-	inc a
-	ld b,a
+	ret z	;; will need to change later
 	ld hl,(inputBuffer_curP)
-	ld de,16
-	add hl,de
-	ld de,(inputBuffer_endP)
-	ld a,d
-	cp h
-	ret c
-	jr nz,_
-	ld a,e
-	cp l
-	ret c
-_	ld a,b
-	ld (curRow),a
+	ld de,(inputBuffer_offsetE)
+	ld bc,0
+	; b -> length sum
+	; c -> # of tokens summed
+	jr _
+eval_move_cursor_down_sumlen:
+	ld a,(hl)
+	push hl
+	push de
+	push bc
+	call tok2titok
+	bcall(_GetTokLen)
+	pop bc
+	pop de
+	pop hl
+	add a,b
+	ld b,a
+	inc hl
+	dec de
+	inc c
+	cp 16
+	jr nc,eval_move_cursor_down_more
+_	ld a,d
+	or e
+	jr nz,eval_move_cursor_down_sumlen
+eval_move_cursor_down_more:
+	;; a = total length of tokens
+	;; c = # of tokens
 	ld (inputBuffer_curP),hl
+	ld (inputBuffer_offsetE),de
+	;; now update cursor
+	ld hl,(curRow)
+	ld c,0
+	add hl,bc
+	call cursor_adjust
+	ld (curRow),hl
 	ret
+	
 	
 eval_move_cursor_up:
 	ld a,(curRow)
 	or a
-	call z,eval_scroll_up
-	ld a,(curRow)
-	or a
-	ret z
-	dec a
-	ld (curRow),a
+	;ret z	;; will need to change later to call z,scroll up
 	ld hl,(inputBuffer_curP)
-	ld de,-16
+	ld de,-inputBuffer
 	add hl,de
-	ld (inputBuffer_curP),hl
+	ex de,hl	;; de = # of tokens preceding cursor position
+	ld hl,(inputBuffer_curP)
+	ld bc,0	;; want to find sum of tok lengths >= 16
+	; b -> length sum
+	; c -> # of tokens summed
+	jr _
+eval_move_cursor_up_sumlen:
+	dec hl
+	ld a,(hl)
+	push hl
+	push de
+	push bc
+	call tok2titok
+	bcall(_GetTokLen)
+	pop bc
+	pop de
+	pop hl
+	add a,b
+	ld b,a
+	dec de
+	inc c	;; inc # of tokens
+	cp 16
+	jr nc,eval_move_cursor_up_more	;; found length ≥ 16
+_	ld a,d
+	or e
+	jr nz,eval_move_cursor_up_sumlen	;; any more tokens to sum?
+eval_move_cursor_up_more:
+	;; b = total length of tokens
+	;; c = # of tokens summed
+	ld (inputBuffer_curP),hl	 ; update cursor position
+	ld hl,(inputBuffer_offsetE)
+	ld e,c
+	ld d,0
+	add hl,de
+	ld (inputBuffer_offsetE),hl
+	;; now update cursor
+	ld a,b
+	neg
+	ld b,a
+	ld c,0
+	ld hl,(curRow)
+	add hl,bc
+	call cursor_adjust
+	ld (curRow),hl
 	ret
 	
 
@@ -298,27 +355,15 @@ eval_overwrite_tok:
 	ret z	; if old & new token lengths were same, then done
 	;; otherwise need to update rest of display
 	;; hl = offset
-	ex de,hl	; use de as loop counter, note de > 0
+	ld b,h
+	ld c,l	;; ld bc,hl
 	ld hl,(curRow)
 	push hl		; save cursor position
-	ld a,d
-	or e
+	ld a,b
+	or c
 	jr z,_
 	ld hl,(inputBuffer_curP)
-eval_overwrite_tok_disploop:
-	push de
-	push hl
-	ld a,(hl)
-	call tok2titok
-	bcall(_PutTokString)
-	pop hl
-	pop de
-	inc hl
-	dec de
-	ld a,d
-	or e
-	jr nz,eval_overwrite_tok_disploop
-
+	call display_toks
 _	ld a,(scrap+1)	; # of spaces to write
 	bit 7,a			; test if a is negative
 	jr nz,_
@@ -362,24 +407,15 @@ _	ld a,b
 	ld bc,(inputBuffer_offsetE)
 	ld de,(curRow)
 	push de
-eval_insert_tok_disploop:
-	;; hl ptr to tok
-	push hl
-	push bc
-	ld a,(hl)
-	call tok2titok
-	bcall(_PutTokString)
-	pop bc
-	pop hl
-	inc hl
-	dec bc
-	ld a,b
-	or c
-	jr nz,eval_insert_tok_disploop
+	call display_toks
 	pop de
 	ld (curRow),de
 	ret
 
+	
+
+	
+	
 	
 eval_scroll_up:
 	;; scrolls up one line
