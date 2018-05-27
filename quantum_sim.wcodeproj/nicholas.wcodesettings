@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>ProjectDetailSwapViewHeight</key>
-	<real>91</real>
+	<real>100</real>
 	<key>ProjectErrorsAndWarningsTableViewAutosaveDictionary</key>
 	<dict>
 		<key>Icon</key>
@@ -18,7 +18,7 @@
 			<key>AutosavedColumnIndex</key>
 			<integer>2</integer>
 			<key>AutosavedColumnWidth</key>
-			<real>228</real>
+			<real>406</real>
 		</dict>
 		<key>Message</key>
 		<dict>
@@ -80,6 +80,7 @@
 		<string>evaluator.asm</string>
 		<string>util.inc</string>
 		<string>ti83plus.inc</string>
+		<string>tables.asm</string>
 	</array>
 	<key>ProjectSelectedTextFileName</key>
 	<string>evaluator.asm</string>
@@ -117,6 +118,6 @@
 	<key>ProjectSymbolsTableViewSortDescriptors</key>
 	<array/>
 	<key>ProjectWindowFrameKey</key>
-	<string>691 56 668 821 0 0 1440 877 </string>
+	<string>594 56 846 821 0 0 1440 877 </string>
 </dict>
 </plist>

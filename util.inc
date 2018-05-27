@@ -43,3 +43,19 @@ min_hl_de:
 _	ld h,d
 	ld l,e
 	ret
+	
+cursor_adjust:
+	;; input: hl = (curCol, curRow)
+	;; output: hl such that 0 ≤ curCol < 16
+	;; destroys: a
+	ld a,h
+	sra a
+	sra a
+	sra a
+	sra a	;; (h & 0xF0) >> 4
+	add a,l
+	ld l,a
+	ld a,$0F
+	and h
+	ld h,a
+	ret
