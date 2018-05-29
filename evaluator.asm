@@ -60,9 +60,11 @@ eval_handle_arrow:
 	cp kRight
 	jr z,eval_move_cursor_right
 	cp kDown
-	jp z,eval_move_cursor_down
+	;jp z,eval_move_cursor_down
+	jp z,eval_scroll_down
 	cp kUp
-	jp z,eval_move_cursor_up
+	;jp z,eval_move_cursor_up
+	jp z,eval_scroll_up
 _	bcall(_CursorOn)
 	ret
 	
@@ -120,32 +122,9 @@ eval_move_cursor_down:
 	ret z	;; will need to change later
 	ld hl,(inputBuffer_curP)
 	ld de,(inputBuffer_offsetE)
-	ld bc,0
-	; b -> length sum
-	; c -> # of tokens summed
-	jr _
-eval_move_cursor_down_sumlen:
-	ld a,(hl)
-	push hl
-	push de
-	push bc
-	call tok2titok
-	bcall(_GetTokLen)
-	pop bc
-	pop de
-	pop hl
-	add a,b
-	ld b,a
-	inc hl
-	dec de
-	inc c
-	cp 16
-	jr nc,eval_move_cursor_down_more
-_	ld a,d
-	or e
-	jr nz,eval_move_cursor_down_sumlen
-eval_move_cursor_down_more:
-	;; a = total length of tokens
+	ld a,16
+	call scantoklen_fwd
+	;; b = total length of tokens
 	;; c = # of tokens
 	ld (inputBuffer_curP),hl
 	ld (inputBuffer_offsetE),de
@@ -161,39 +140,14 @@ eval_move_cursor_down_more:
 eval_move_cursor_up:
 	ld a,(curRow)
 	or a
-	;ret z	;; will need to change later to call z,scroll up
+	call z,eval_scroll_up
 	ld hl,(inputBuffer_curP)
 	ld de,-inputBuffer
 	add hl,de
 	ex de,hl	;; de = # of tokens preceding cursor position
 	ld hl,(inputBuffer_curP)
-	ld bc,0	;; want to find sum of tok lengths >= 16
-	; b -> length sum
-	; c -> # of tokens summed
-	jr _
-eval_move_cursor_up_sumlen:
-	dec hl
-	ld a,(hl)
-	push hl
-	push de
-	push bc
-	call tok2titok
-	bcall(_GetTokLen)
-	pop bc
-	pop de
-	pop hl
-	add a,b
-	ld b,a
-	dec de
-	inc c	;; inc # of tokens
-	cp 16
-	jr nc,eval_move_cursor_up_more	;; found length ≥ 16
-_	ld a,d
-	or e
-	jr nz,eval_move_cursor_up_sumlen	;; any more tokens to sum?
-eval_move_cursor_up_more:
-	;; b = total length of tokens
-	;; c = # of tokens summed
+	ld a,16
+	call scantoklen_rev
 	ld (inputBuffer_curP),hl	 ; update cursor position
 	ld hl,(inputBuffer_offsetE)
 	ld e,c
@@ -299,20 +253,21 @@ eval_handle_del:
 _	bcall(_CursorOn)
 	ret
 
+
 eval_handle_clear:
 	bcall(_CursorOff)
 	ld hl,inputBuffer
 	ld (hl),0
 	ld (inputBuffer_endP),hl
 	ld (inputBuffer_curP),hl
-	
 	ld hl,0
+	ld (inputBuffer_offsetE),hl
 	ld (curRow),hl
 	bcall(_ClrScrnFull)
 	bcall(_CursorOn)
 	ret
 
-; DONE
+
 eval_append_tok:	
 	ld hl,(inputBuffer_curP)
 	ld (hl),b	; store new token
@@ -414,70 +369,159 @@ _	ld a,b
 
 	
 
-	
-	
-	
 eval_scroll_up:
 	;; scrolls up one line
-	bcall(_ClrScrnFull)
-	ld de,(curRow)
-	ld a,e
+	ld a,(curRow)
 	cp 7
-	adc a,0
-	ld e,a	; e = min{7,row+1}
-	
-	ld a,e	; a = max{0,row-1}
-	sla a
-	sla a
-	sla a
-	sla a
-	add a,d	; a = row*16 + col
-	ld b,$FF
-	neg
-	ld c,a
-	jr nz,_
-	ld b,$00
-_	ld hl,(inputBuffer_curP)
-	add hl,bc
-	;; comp w/ inputBuffer (begin)
-	
+	ret z	; if row=7, abort
+	bcall(_ClrScrnFull)
+	ld hl,(curRow)
+	inc l
+	push hl
+	ld de,0
+	ld (curRow),de
+	sla l
+	sla l
+	sla l
+	sla l
 	ld a,h
-	cp inputBuffer>>8
-	jr c,eval_scroll_update
-	ld a,l
-	cp inputBuffer&$00FF
-	jr nc,eval_scroll_update
-	ld hl,inputBuffer
-	ld de,(curRow)
-	jr eval_scroll_update
+	add a,l	; a = (row-1)*16 + col + 16
+	push af
+	push af
+	ld hl,-inputBuffer
+	ld de,(inputBuffer_curP)
+	add hl,de
+	ex de,hl
+	call scantoklen_rev
+	pop af
+	sub b	; target - actual, if neg, then need to disp prev token
+	or a
+	jr z,_
+		
+	;; display previous token partially on screen
+	ld b,a
+	push hl
+	push bc
+	ld a,(hl)	; a = partially displayed token
+	call tok2titok
+	ld (scrap),de	;; need ptr to token for bcall
+	ld hl,scrap
+	bcall(_Get_Tok_Strng)
+	;; a is token legnth
+	pop bc
+	ld a,b	
+	neg		; a = # of chars to exclude from token
+	ld hl,OP3
+	ld d,0
+	ld e,a
+	add hl,de
+	bcall(_PutS)
+	pop hl
+	inc hl
+	dec c	; decrease # of tokens to display	
+_
+	ld a,c
+	cpl
+	ld e,a
+	ld d,$FF
+	ld hl,(inputBuffer_curP)
+	inc de
+	add hl,de
+	ld b,0
+	call display_toks
+	pop bc	;; linear cursor offset from (0,0)
+	ld a,128
+	sub b
+	ld hl,(inputBuffer_curP)
+	ld de,(inputBuffer_offsetE)
+	call scantoklen_fwd
+	;; c = # of tokens to print
+	ld b,0
+	ld hl,(inputBuffer_curP)
+	ld a,c
+	or a
+	call nz,display_toks
+	pop hl
+	ld (curRow),hl
+	ret
+
+
+
+
 	
 eval_scroll_down:
 	;; scrolls down one line
+	ld a,(curRow)
+	or a
+	ret z	; if row=0, abort
 	bcall(_ClrScrnFull)
-	ld de,(curRow)
-	xor a
-	cp e
-	jr z,_
-	dec e
-_	ld a,e	; a = max{0,row-1}
-	sla a
-	sla a
-	sla a
-	sla a
-	add a,d	; a = row*16 + col
-	ld b,$FF
-	neg
-	ld c,a
-	jr nz,_
-	ld b,$00
-_	ld hl,(inputBuffer_curP)
-	add hl,bc	; hl = buffer cursor ptr - (row*16+col)
-eval_scroll_update:
-	ld bc,0
-	ld (curRow),bc
-	bcall(_PutS)
+	ld hl,(curRow)
+	dec l
+	push hl
+	ld de,0
 	ld (curRow),de
+	sla l
+	sla l
+	sla l
+	sla l
+	ld a,h
+	add a,l	; a = (row-1)*16 + col + 16
+	push af
+	push af
+	ld hl,-inputBuffer
+	ld de,(inputBuffer_curP)
+	add hl,de
+	ex de,hl
+	call scantoklen_rev
+	pop af
+	sub b	; target - actual, if neg, then need to disp prev token
+	or a
+	jr z,_
+		
+	;; display previous token partially on screen
+	ld b,a
+	push hl
+	push bc
+	ld a,(hl)	; a = partially displayed token
+	call tok2titok
+	ld (scrap),de	;; need ptr to token for bcall
+	ld hl,scrap
+	bcall(_Get_Tok_Strng)
+	;; a is token legnth
+	pop bc
+	ld a,b	
+	neg		; a = # of chars to exclude from token
+	ld hl,OP3
+	ld d,0
+	ld e,a
+	add hl,de
+	bcall(_PutS)
+	pop hl
+	inc hl
+	dec c	; decrease # of tokens to display	
+_
+	ld a,c
+	cpl
+	ld e,a
+	ld d,$FF
+	ld hl,(inputBuffer_curP)
+	inc de
+	add hl,de
+	ld b,0
+	call display_toks
+	pop bc	;; linear cursor offset from (0,0)
+	ld a,128
+	sub b
+	ld hl,(inputBuffer_curP)
+	ld de,(inputBuffer_offsetE)
+	call scantoklen_fwd
+	;; c = # of tokens to print
+	ld b,0
+	ld hl,(inputBuffer_curP)
+	ld a,c
+	or a
+	call nz,display_toks
+	pop hl
+	ld (curRow),hl
 	ret
-	
-	
 	

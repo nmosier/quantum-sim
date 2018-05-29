@@ -61,6 +61,10 @@ cursor_adjust:
 	ret
 
 display_toks:
+	ld a,b
+	or c
+	ret z
+display_toks_loop:
 	;; input:	hl = ptr to beginning of tok array
 	;; 			bc = # of toks to display
 	;; destroys:
@@ -75,5 +79,79 @@ display_toks:
 	dec bc
 	ld a,b
 	or c
-	jr nz,display_toks
+	jr nz,display_toks_loop
+	ret
+	
+
+;; scantoklen_fwd
+; inputs:	hl = pointer to begininning of token array
+;			de = max # of tokens to scan
+;			a = target length (finds legnth ≥ a)
+; outputs:	b = length of tokens summed
+;			c = # of tokens summed
+; destroys: scrap[0]
+scantoklen_fwd:
+	ld (scrap),a
+	ld bc,0
+	or a
+	ret z
+	jr _
+scantoklen_fwd_loop:
+	ld a,(hl)
+	push hl
+	push de
+	push bc
+	call tok2titok
+	bcall(_GetTokLen)
+	pop bc
+	pop de
+	add a,b
+	ld b,a
+	dec de
+	inc c
+	ld hl,scrap
+	cp (hl)	; compare to target length
+	pop hl	; doesn't affect
+	inc hl	; flags, so good
+	ret nc
+_
+	ld a,d
+	or e
+	jr nz,scantoklen_fwd_loop
+	ret
+	
+;; scantoklen_rev
+; inputs:	hl = pointer to one past end of array (like it.end())
+;			de = max # of tokens to scan
+;			a = target length
+; outputs:	b = actual length summed
+;			c = actual # tokens summed
+; destroys:	scrap[0]
+scantoklen_rev:
+	ld (scrap),a	; save target
+	ld bc,0			; reset length & tok count
+	or a
+	ret z
+	jr _	
+scantoklen_rev_loop:
+	dec hl
+	ld a,(hl)
+	push hl
+	push de
+	push bc
+	call tok2titok
+	bcall(_GetTokLen)
+	pop bc
+	pop de
+	add a,b
+	ld b,a
+	dec de
+	inc c	;; inc # of tokens
+	ld hl,scrap
+	cp (hl)
+	pop hl
+	ret nc	;; found length
+_	ld a,d
+	or e
+	jr nz,scantoklen_rev_loop	;; any more tokens to sum?
 	ret

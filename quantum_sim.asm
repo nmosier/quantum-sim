@@ -14,16 +14,7 @@ main:
 	bcall(_ClrLCDFull)
 	ld hl,0
 	ld (curRow),hl	; set cursor to (0,0)
-	
-	; test PutKet
-	xor a
-	set ketMode,a
-	ld (evalFlags),a
-	
-	ld a,3
-	ld hl,5
-	call PutKet
-	
+
 	call eval_get_input
 done:
 	bjump(_JForceCmdNoChar)
