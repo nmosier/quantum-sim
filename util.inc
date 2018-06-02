@@ -155,3 +155,16 @@ _	ld a,d
 	or e
 	jr nz,scantoklen_rev_loop	;; any more tokens to sum?
 	ret
+
+;; get_cursor_offset
+;; inputs:	h = col
+;;			l = row
+;; outputs: a = offset
+get_cursor_offset:
+	sla l
+	sla l
+	sla l
+	sla l
+	ld a,h
+	add a,l
+	ret

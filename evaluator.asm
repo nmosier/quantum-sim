@@ -30,7 +30,6 @@ eval_get_input:
 	bcall(_ClrScrnFull)
 	ld hl,0
 	ld (curRow),hl
-	;set curAble,(iy+curFlags)	; blinking cursor
 	bcall(_CursorOn)
 
 eval_get_input_loop:
@@ -60,11 +59,9 @@ eval_handle_arrow:
 	cp kRight
 	jr z,eval_move_cursor_right
 	cp kDown
-	;jp z,eval_move_cursor_down
-	jp z,eval_scroll_down
+	jp z,eval_move_cursor_down
 	cp kUp
-	;jp z,eval_move_cursor_up
-	jp z,eval_scroll_up
+	jp z,eval_move_cursor_up
 _	bcall(_CursorOn)
 	ret
 	
@@ -88,6 +85,9 @@ eval_move_cursor_right:
 	add hl,de
 	call cursor_adjust
 	ld (curRow),hl
+	ld a,7
+	cp l
+	call c,eval_scroll_down
 	ret
 
 eval_move_cursor_left:
@@ -111,15 +111,18 @@ _
 	ld h,a
 	call cursor_adjust
 	ld (curRow),hl
-	ld hl,(inputBuffer_offsetE)
-	inc hl
-	ld (inputBuffer_offsetE),hl
+	ld de,(inputBuffer_offsetE)
+	inc de
+	ld (inputBuffer_offsetE),de
+	bit 7,l	;; check if row neg
+	call nz,eval_scroll_up
 	ret
 
 eval_move_cursor_down:
 	ld a,(curRow)
 	cp 7
-	ret z	;; will need to change later
+	call nc,eval_scroll_down
+	ret nc	; return if failure to scroll down. Note if a < 7, then will not call fn or return
 	ld hl,(inputBuffer_curP)
 	ld de,(inputBuffer_offsetE)
 	ld a,16
@@ -140,7 +143,9 @@ eval_move_cursor_down:
 eval_move_cursor_up:
 	ld a,(curRow)
 	or a
+	scf
 	call z,eval_scroll_up
+	ret nc	;; if try to scroll & fails, return
 	ld hl,(inputBuffer_curP)
 	ld de,-inputBuffer
 	add hl,de
@@ -277,6 +282,17 @@ eval_append_tok:
 	ld (hl),0
 	ld a,b
 	call tok2titok	; get ti-tok to print
+	push de
+	bcall(_GetTokLen)
+	ld hl,(curRow)
+	add a,h
+	ld h,a
+	call cursor_adjust
+	ld a,l
+	cp 8
+	call nc,eval_scroll_down	; if row≥8, scroll down
+	pop de
+	ret nc						; this error should NEVER trigger
 	bcall(_PutTokString)
 	ret
 
@@ -309,17 +325,25 @@ eval_overwrite_tok:
 	or a
 	ret z	; if old & new token lengths were same, then done
 	;; otherwise need to update rest of display
-	;; hl = offset
-	ld b,h
-	ld c,l	;; ld bc,hl
+	;; hl = offset from end pointer
+	ex de,hl	; de = max # tokens to scan
+;	ld b,h
+;	ld c,l	;; ld bc,hl
+	ld bc,(curRow)
+	push bc		; save cursor position
+;	ld a,b
+;	or c
 	ld hl,(curRow)
-	push hl		; save cursor position
-	ld a,b
-	or c
-	jr z,_
+	call get_cursor_offset
+	neg
+	add a,128	; a=128-offset
 	ld hl,(inputBuffer_curP)
+	inc hl
+	call scantoklen_fwd
+	ld hl,(inputBuffer_curP)
+	ld b,0
 	call display_toks
-_	ld a,(scrap+1)	; # of spaces to write
+	ld a,(scrap+1)	; # of spaces to write
 	bit 7,a			; test if a is negative
 	jr nz,_
 	ld b,a
@@ -357,24 +381,45 @@ _	ld a,b
 	inc de
 	ld (inputBuffer_curP),de
 	call tok2titok
-	bcall(_PutTokString)	; display new token
-	ld hl,(inputBuffer_curP)
-	ld bc,(inputBuffer_offsetE)
-	ld de,(curRow)
-	push de
-	call display_toks
-	pop de
-	ld (curRow),de
-	ret
-
 	
+	push de
+	bcall(_GetTokLen)
+	pop de
+	ld hl,(curRow)
+	add a,h
+	ld h,a
+	call cursor_adjust
+	ld a,7
+	cp l
+	jr c,eval_insert_tok_scroll
+	
+	bcall(_PutTokString)	; display new token
+	ld hl,(curRow)
+	push hl
+	call get_cursor_offset
+	neg
+	add a,128
+	bit 7,a		; test if negative
+	ld hl,(inputBuffer_curP)
+	ld de,(inputBuffer_offsetE)
+	call scantoklen_fwd
+	ld hl,(inputBuffer_curP)
+	ld b,0
+	call display_toks
+	pop hl
+	ld (curRow),hl
+	ret
+eval_insert_tok_scroll:
+	ld (curRow),hl
+	jp eval_scroll_down	
 
 eval_scroll_up:
 	;; scrolls up one line
+	;; carry flag SET if successful
+	;; carry flag RESET if error
 	ld a,(curRow)
-	cp 7
+	cp 7	; nc will be reset if a ≥ 7
 	ret z	; if row=7, abort
-	bcall(_ClrScrnFull)
 	ld hl,(curRow)
 	inc l
 	push hl
@@ -395,9 +440,19 @@ eval_scroll_up:
 	call scantoklen_rev
 	pop af
 	sub b	; target - actual, if neg, then need to disp prev token
-	or a
+	jr c,_
 	jr z,_
-		
+	jr eval_scroll_up_error
+_	push af
+	push hl
+	push bc
+	push de
+	bcall(_ClrScrnFull)
+	pop de
+	pop bc
+	pop hl
+	pop af
+	jr z,_
 	;; display previous token partially on screen
 	ld b,a
 	push hl
@@ -443,16 +498,25 @@ _
 	call nz,display_toks
 	pop hl
 	ld (curRow),hl
+	scf	; set carry flag to mark success
 	ret
-
+eval_scroll_up_error:
+	pop af
+	pop hl	; updated col, row -> invalid
+	dec l
+	ld (curRow),hl
+	or a	; reset carry flag
+	ret
 
 
 
 	
 eval_scroll_down:
 	;; scrolls down one line
+	;; carry flag SET if successful
+	;; carry flag RESET if error
 	ld a,(curRow)
-	or a
+	or a	; resets carry flag (nc)
 	ret z	; if row=0, abort
 	bcall(_ClrScrnFull)
 	ld hl,(curRow)
@@ -477,7 +541,6 @@ eval_scroll_down:
 	sub b	; target - actual, if neg, then need to disp prev token
 	or a
 	jr z,_
-		
 	;; display previous token partially on screen
 	ld b,a
 	push hl
@@ -523,5 +586,6 @@ _
 	call nz,display_toks
 	pop hl
 	ld (curRow),hl
+	scf
 	ret
 	
