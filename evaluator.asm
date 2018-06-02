@@ -221,7 +221,9 @@ eval_handle_gates:
 
 eval_handle_del:
 	bcall(_CursorOff)
-	;; opposite of insert
+	
+	ld hl,(curRow)
+	push hl
 	ld hl,(inputBuffer_curP)
 	ld bc,(inputBuffer_endP)
 	ld a,h
@@ -240,22 +242,45 @@ eval_handle_del:
 	ld c,l
 	ld de,(inputBuffer_curP)
 	ld hl,(inputBuffer_curP)
+	ld a,(hl)
+	ld (scrap+2),a
 	inc hl
 	ldir
 	
 	ld hl,(inputBuffer_endP)
 	dec hl
 	ld (inputBuffer_endP),hl
+	ld de,(inputBuffer_offsetE)
+	dec de
+	ld (inputBuffer_offsetE),de
 	; don't need to store 0 at endP, since lddr copied it
-	; also don't need to update curP	
+	; also don't need to update curP
+	ld hl,(curRow)
+	call get_cursor_offset
+	neg
+	add a,128
 	ld hl,(inputBuffer_curP)
-	ld de,(curRow)
-	bcall(_PutS)
-	ld a,' '
-	bcall(_PutMap)	; overwrite last char
-	ld (curRow),de
+	; de = max # tokens
+	; a = max len sum
+	call scantoklen_fwd
+	ld hl,(inputBuffer_curP)
+	ld b,0
+	call display_toks
 	
-_	bcall(_CursorOn)
+	ld a,(scrap+2)
+	call tok2titok
+	bcall(_GetTokLen)
+	ld b,a
+eval_handle_del_spaces:
+	ld a,(curRow)
+	cp 8
+	jr nc,_
+	ld a,' '
+	bcall(_PutC)
+	djnz eval_handle_del_spaces
+_	pop hl
+	ld (curRow),hl
+	bcall(_CursorOn)
 	ret
 
 
