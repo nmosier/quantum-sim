@@ -173,6 +173,15 @@ eval_move_cursor_up:
 
 eval_handle_enter:
 	pop de
+	ld hl,inputBuffer
+	neg_hl
+	ld de,(inputBuffer_endP)
+	add hl,de
+	ld b,h
+	ld c,l	; ld bc,hl
+	ld hl,inputBuffer
+	call lex_input	;; lex input
+	;call parse_input	;; parse input
 	ret
 
 eval_handle_insert:

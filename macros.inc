@@ -14,3 +14,7 @@
 	ld hl,imm16
 	push hl
 #endmacro
+
+#macro neg_hl
+	
+#endmacro

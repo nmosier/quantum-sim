@@ -75,4 +75,5 @@ PutKet_ints:
 	ret
 	
 #include "evaluator.asm"
+#include "lexer.asm"
 #include "util.inc"
