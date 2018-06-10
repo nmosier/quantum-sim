@@ -17,7 +17,6 @@ input_JT:
 	fill_word($09-$05-1, eval_handle_none)
 	.dw eval_handle_clear	;$09
 	.dw eval_handle_del		;$0A
-	fill_word($0B-$0A-1, eval_handle_none)
 	.dw eval_handle_insert	;$0B
 	.dw eval_handle_none	;$0C
 	.dw eval_handle_none	;$0D
@@ -90,6 +89,9 @@ qtSin		equ $13
 qtCos		equ $14
 qtTan		equ $15
 qtSquare	equ $16
+qtKet		equ $17
+qtBra		equ $18
+
 qtUnk 		equ $FF
 ;--------------------------;
 
@@ -118,7 +120,10 @@ tok2tiTok:
 	ret
 
 k2tok_LUT:
-	.fill $80,qtUnk	;$00-$79
+	.fill $0E,qtUnk	;$00-$0D
+	.db qtUnk		;$0E
+	.db qtUnk		;$0F
+	.fill $80-$0F-1,qtUnk	; $10-$79
 	.db qtPlus		;$80
 	.db qtMinus		;$81
 	.db qtTimes		;$82
@@ -149,6 +154,9 @@ k2tok_LUT:
 	.db qtSquare	;$BD
 	.fill $FB-$BD,qtUnk
 	
+	
+;; lookup table for quantum toks (qtoks) to TI-OS tokens (titoks)
+; a lookup value of 0 signifies no titok equivalent (lookup miss)
 tok2tiTok_LUT:
 	.dw 0		;tqEOF			equ 00h
 	.dw tAdd	;tqPlus 		equ 01h
@@ -173,4 +181,87 @@ tok2tiTok_LUT:
 	.dw tCos	;qtCos
 	.dw tTan	;qtTan
 	.dw tSqr	;qtSquare
-	;qtUnk		equ FFh
+	.dw 0		;qtKet
+	.dw 0		;qtKet
+	
+
+tok2str:
+	;; input:	a = qtok
+	;; output: 	hl = ptr to qtok string
+	;; destroys: de
+	sla a
+	ld e,a
+	ld d,0
+	ld hl,tok2str_LUT
+	add hl,de
+	ld a,(hl)
+	inc hl
+	ld h,(hl)
+	ld l,a
+	ret
+
+tok2len:
+	;; input: a = qtok
+	;; output: a = length(tok2str(qtok))
+	call tok2str
+	ld a,(hl)
+	ret
+
+puttokstr:
+	;; input: a = qtok
+	;; output: (none)
+	;; flags: carry=1 if entire string displayed
+	call tok2str
+	jp PutStr
+
+tok2str_LUT:
+	.dw 0		;tqEOF			equ 00h
+	.dw strPlus		;tqPlus 		equ 01h
+	.dw strMinus		;tqMinus		equ 02h
+	.dw strTimes		;tqTimes		equ 03h
+	.dw strDiv		;tqDiv 		equ 04h
+	.dw strLeftP		;tqLeftP		equ 05h
+	.dw strRightP		;tqRightP	equ 06h
+	.dw strNeg		;tqNeg		equ 07h
+	.dw strPeriod		;tqPeriod	equ 08h
+	.dw strN0		;tq0			equ 09h
+	.dw strN1		;tq1			equ 0Ah
+	.dw strN2		;tq2			equ 0Bh
+	.dw strN3		;tq3			equ 0Ch
+	.dw strN4		;tq4			equ 0Dh
+	.dw strN5		;tq5			equ 0Fh
+	.dw strN6		;tq6			equ 10h
+	.dw strN7		;tq7			equ 11h
+	.dw strN8		;tq8			equ 12h
+	.dw strN9		;tq9			equ 13h
+	.dw strSin	;qtSin
+	.dw strCos	;qtCos
+	.dw strTan	;qtTan
+	.dw strSquare	;qtSquare
+	.dw strKet		;qtKet
+	.dw strBra		;qtBra
+	
+strPlus: 	.db 1,"+"
+strMinus: 	.db 1,Ldash	;"-"
+strTimes:	.db 1,"*"
+strDiv:		.db 1,"/"
+strLeftP:	.db 1,"("
+strRightP:	.db 1,")"
+strNeg:		.db 1,Lneg
+strPeriod:	.db 1,"."
+strN0:		.db 1,"0"
+strN1:		.db 1,"1"
+strN2:		.db 1,"2"
+strN3:		.db 1,"3"
+strN4:		.db 1,"4"
+strN5:		.db 1,"5"
+strN6:		.db 1,"6"
+strN7:		.db 1,"7"
+strN8:		.db 1,"8"
+strN9:		.db 1,"9"
+strSin:		.db 4,"sin("
+strCos:		.db 4,"cos("
+strTan:		.db 4,"tan("
+strSquare:	.db 1,Lsquare
+strKet:		.db 4,"ket("
+strBra:		.db 4,"bra("

@@ -69,14 +69,19 @@ display_toks_loop:
 	;; 			bc = # of toks to display
 	;; destroys:
 	push hl
-	push bc
+;	push bc
 	ld a,(hl)
-	call tok2titok
-	bcall(_PutTokString)
-	pop bc
+	;call tok2titok
+	;bcall(_PutTokString)
+	push de
+	call tok2str
+	call PutStr
+	pop de
+;	pop bc
 	pop hl
 	inc hl
 	dec bc
+	ret nc	; if string didn't fully display, stop
 	ld a,b
 	or c
 	jr nz,display_toks_loop
@@ -100,10 +105,10 @@ scantoklen_fwd_loop:
 	ld a,(hl)
 	push hl
 	push de
-	push bc
-	call tok2titok
-	bcall(_GetTokLen)
-	pop bc
+	;call tok2titok
+	;bcall(_GetTokLen)
+	call tok2len
+	;
 	pop de
 	add a,b
 	ld b,a
@@ -138,10 +143,7 @@ scantoklen_rev_loop:
 	ld a,(hl)
 	push hl
 	push de
-	push bc
-	call tok2titok
-	bcall(_GetTokLen)
-	pop bc
+	call tok2len
 	pop de
 	add a,b
 	ld b,a
@@ -167,4 +169,34 @@ get_cursor_offset:
 	sla l
 	ld a,h
 	add a,l
+	ret
+
+	
+	;;PutStr
+	;; void PutStr(char*)
+	;; input: hl = ptr to string to display
+	;;    string is prefixed by length (not zero-terminated!)
+	;; flags: carry flag set if entire string displayed
+	
+	;;PutStrA
+	;; void PutStr(char*, byte n)
+	;; input: hl = ptr to one char BEFORE string to display
+	;; 		  a = length of string
+	;; flags: carry flag set if entire string displayed
+PutStr:
+	ld a,(hl)
+PutStrA:
+	or a
+	scf	
+	ret z
+	ld b,a
+	ld de,curRow
+PutStr_loop:
+	inc hl
+	ld a,(hl)
+	bcall(_PutC)
+	ld a,(de)
+	cp 8
+	ret z	;; carry flag will correctly be reset upon return
+	djnz PutStr_loop
 	ret

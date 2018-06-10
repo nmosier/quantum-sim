@@ -77,8 +77,9 @@ eval_move_cursor_right:
 	ld a,(hl)
 	inc hl
 	ld (inputBuffer_curP),hl
-	call tok2titok
-	bcall(_GetTokLen)
+	;call tok2titok
+	;bcall(_GetTokLen)
+	call tok2len
 	ld d,a
 	ld e,0
 	ld hl,(curRow)
@@ -103,8 +104,9 @@ _
 	dec hl
 	ld (inputBuffer_curP),hl
 	ld a,(hl)
-	call tok2titok
-	bcall(_GetTokLen)
+	;call tok2titok
+	;bcall(_GetTokLen)
+	call tok2len
 	ld hl,(curRow)
 	neg
 	add a,h
@@ -190,7 +192,6 @@ eval_handle_insert:
 	ld (iy+textFlags),a
 	ret
 
-;CONVERTED
 eval_handle_char:
 	; a = GetKey scan code
 	ld b,a
@@ -221,6 +222,12 @@ eval_handle_char:
 _	bcall(_CursorOn)
 	ret
 
+eval_handle_ket:
+	
+	ret
+
+eval_handle_bra:
+	ret
 
 eval_handle_vars:
 	ret
@@ -277,8 +284,9 @@ eval_handle_del:
 	call display_toks
 	
 	ld a,(scrap+2)
-	call tok2titok
-	bcall(_GetTokLen)
+	;;call tok2titok
+	;;bcall(_GetTokLen)
+	call tok2len
 	ld b,a
 eval_handle_del_spaces:
 	ld a,(curRow)
@@ -315,32 +323,30 @@ eval_append_tok:
 	ld (inputBuffer_endP),hl
 	ld (hl),0
 	ld a,b
-	call tok2titok	; get ti-tok to print
-	push de
-	bcall(_GetTokLen)
+	call tok2str
+	push hl
+	ld a,(hl)
 	ld hl,(curRow)
 	add a,h
 	ld h,a
 	call cursor_adjust
 	ld a,l
 	cp 8
-	call nc,eval_scroll_down	; if row≥8, scroll down
-	pop de
-	ret nc						; this error should NEVER trigger
-	bcall(_PutTokString)
-	ret
+	ex de,hl					; preserve cursor position in de
+	pop hl
+	jp c,PutStr					; if row < 8, then just need to put string @ current cursor position
+	ld (curRow),de				; if row ≥ 8, then just need to scroll down (which will display the new token, too)
+	jp nc,eval_scroll_down		;  but needs updated cursor position
 
 eval_overwrite_tok:
 	;; INPUT: a = tok to overwrite with
 	;; * assumes inputBuffer_curP < inputBuffer_endP *
 	ld (scrap),a	; save new token
-	call tok2titok
-	bcall(_GetTokLen)
+	call tok2len
 	ld (scrap+1),a	;save new token len
 	ld hl,(inputBuffer_curP)
 	ld a,(hl)
-	call tok2titok
-	bcall(_GetTokLen)
+	call tok2len
 	ld hl,scrap+1
 	sub (hl)
 	ld (hl),a	; scrap+1 contains # of spaces to write at end
@@ -350,8 +356,7 @@ eval_overwrite_tok:
 	ld (hl),a
 	inc hl
 	ld (inputBuffer_curP),hl	; update cursor
-	call tok2titok
-	bcall(_PutTokString)
+	call puttokstr
 	ld hl,(inputBuffer_offsetE)
 	dec hl
 	ld (inputBuffer_offsetE),hl	; update end offset
@@ -361,12 +366,8 @@ eval_overwrite_tok:
 	;; otherwise need to update rest of display
 	;; hl = offset from end pointer
 	ex de,hl	; de = max # tokens to scan
-;	ld b,h
-;	ld c,l	;; ld bc,hl
 	ld bc,(curRow)
 	push bc		; save cursor position
-;	ld a,b
-;	or c
 	ld hl,(curRow)
 	call get_cursor_offset
 	neg
@@ -388,6 +389,9 @@ eval_overwrite_tok_spaces:
 	
 _	pop hl
 	ld (curRow),hl	; restore cursor position
+	ld a,l
+	cp 8
+	jp nc,eval_scroll_down
 	ret
 
 
@@ -414,11 +418,10 @@ _	ld a,b
 	ld (de),a
 	inc de
 	ld (inputBuffer_curP),de
-	call tok2titok
-	
-	push de
-	bcall(_GetTokLen)
-	pop de
+	;call tok2titok
+	call tok2str
+	ld a,(hl)
+	ex de,hl
 	ld hl,(curRow)
 	add a,h
 	ld h,a
@@ -426,8 +429,9 @@ _	ld a,b
 	ld a,7
 	cp l
 	jr c,eval_insert_tok_scroll
-	
-	bcall(_PutTokString)	; display new token
+	ex de,hl
+	;bcall(_PutTokString)	; display new token
+	call PutStr;
 	ld hl,(curRow)
 	push hl
 	call get_cursor_offset
@@ -455,16 +459,11 @@ eval_scroll_up:
 	cp 7	; nc will be reset if a ≥ 7
 	ret z	; if row=7, abort
 	ld hl,(curRow)
-	inc l
-	push hl
 	ld de,0
 	ld (curRow),de
-	sla l
-	sla l
-	sla l
-	sla l
-	ld a,h
-	add a,l	; a = (row-1)*16 + col + 16
+	inc l
+	push hl
+	call get_cursor_offset
 	push af
 	push af
 	ld hl,-inputBuffer
@@ -490,21 +489,24 @@ _	push af
 	;; display previous token partially on screen
 	ld b,a
 	push hl
-	push bc
+	;push bc
 	ld a,(hl)	; a = partially displayed token
-	call tok2titok
-	ld (scrap),de	;; need ptr to token for bcall
-	ld hl,scrap
-	bcall(_Get_Tok_Strng)
+	;call tok2titok
+	call tok2str
+	;ld (scrap),hl	;; need ptr to token for bcall
+	;ld hl,scrap
+	;bcall(_Get_Tok_Strng)
 	;; a is token legnth
-	pop bc
+	;pop bc
 	ld a,b	
 	neg		; a = # of chars to exclude from token
-	ld hl,OP3
 	ld d,0
 	ld e,a
+	ld a,(hl)	; a = length of token
+	add a,b		; a = # of tokens to display
 	add hl,de
-	bcall(_PutS)
+	call PutStrA
+	
 	pop hl
 	inc hl
 	dec c	; decrease # of tokens to display	
@@ -578,21 +580,18 @@ eval_scroll_down:
 	;; display previous token partially on screen
 	ld b,a
 	push hl
-	push bc
 	ld a,(hl)	; a = partially displayed token
-	call tok2titok
-	ld (scrap),de	;; need ptr to token for bcall
-	ld hl,scrap
-	bcall(_Get_Tok_Strng)
+	;call tok2titok
+	call tok2str
 	;; a is token legnth
-	pop bc
 	ld a,b	
 	neg		; a = # of chars to exclude from token
-	ld hl,OP3
 	ld d,0
 	ld e,a
+	ld a,(hl)
+	add a,b	; a = remaining chars in token string
 	add hl,de
-	bcall(_PutS)
+	call PutStrA
 	pop hl
 	inc hl
 	dec c	; decrease # of tokens to display	

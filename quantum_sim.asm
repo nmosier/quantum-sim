@@ -12,6 +12,7 @@ defpage(0)
 main:
 	bcall(_CursorOff)
 	bcall(_ClrLCDFull)
+	
 	ld hl,0
 	ld (curRow),hl	; set cursor to (0,0)
 
