@@ -77,8 +77,6 @@ eval_move_cursor_right:
 	ld a,(hl)
 	inc hl
 	ld (inputBuffer_curP),hl
-	;call tok2titok
-	;bcall(_GetTokLen)
 	call tok2len
 	ld d,a
 	ld e,0
@@ -104,8 +102,6 @@ _
 	dec hl
 	ld (inputBuffer_curP),hl
 	ld a,(hl)
-	;call tok2titok
-	;bcall(_GetTokLen)
 	call tok2len
 	ld hl,(curRow)
 	neg
@@ -174,7 +170,6 @@ eval_move_cursor_up:
 	
 
 eval_handle_enter:
-	pop de
 	ld hl,inputBuffer
 	neg_hl
 	ld de,(inputBuffer_endP)
@@ -183,7 +178,12 @@ eval_handle_enter:
 	ld c,l	; ld bc,hl
 	ld hl,inputBuffer
 	call lex_input	;; lex input
-	;call parse_input	;; parse input
+	jr nc,_
+
+	pop de	; don't return to eval_screen (yet?)
+	ret
+	
+_	bjump(_ErrSyntax)
 	ret
 
 eval_handle_insert:
@@ -303,6 +303,11 @@ _	pop hl
 
 eval_handle_clear:
 	bcall(_CursorOff)
+	bcall(_ClrScrnFull)
+	call display_full
+	bcall(_CursorOn)
+	ret
+	; ------------ ;
 	ld hl,inputBuffer
 	ld (hl),0
 	ld (inputBuffer_endP),hl
