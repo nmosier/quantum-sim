@@ -90,7 +90,7 @@
 		<string>parser.asm</string>
 	</array>
 	<key>ProjectSelectedTextFileName</key>
-	<string>util.asm</string>
+	<string>evaluator.asm</string>
 	<key>ProjectSymbolsTableViewAutosaveDictionary</key>
 	<dict>
 		<key>Icon</key>

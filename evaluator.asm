@@ -302,12 +302,6 @@ _	pop hl
 
 
 eval_handle_clear:
-	bcall(_CursorOff)
-	bcall(_ClrScrnFull)
-	call display_full
-	bcall(_CursorOn)
-	ret
-	; ------------ ;
 	ld hl,inputBuffer
 	ld (hl),0
 	ld (inputBuffer_endP),hl
@@ -361,42 +355,45 @@ eval_overwrite_tok:
 	ld (hl),a
 	inc hl
 	ld (inputBuffer_curP),hl	; update cursor
-	call puttokstr
 	ld hl,(inputBuffer_offsetE)
 	dec hl
 	ld (inputBuffer_offsetE),hl	; update end offset
+	
+	ld hl,(curRow)
+	push hl
+	call puttokstr
+	ld a,(scrap)
+	call tok2len
+	pop hl
+	add a,h
+	ld h,a
+	call cursor_adjust
+	ld (curRow),hl
+	ld a,l
+	cp 8
+	jp nc,eval_scroll_down	; if overwriting token causes screen overflow, then scroll down
+	
 	ld a,(scrap+1)	; a = # of spaces to write
 	or a
 	ret z	; if old & new token lengths were same, then done
 	;; otherwise need to update rest of display
-	;; hl = offset from end pointer
-	ex de,hl	; de = max # tokens to scan
-	ld bc,(curRow)
-	push bc		; save cursor position
-	ld hl,(curRow)
-	call get_cursor_offset
-	neg
-	add a,128	; a=128-offset
-	ld hl,(inputBuffer_curP)
-	inc hl
-	call scantoklen_fwd
-	ld hl,(inputBuffer_curP)
-	ld b,0
-	call display_toks
+	call display_after
+	
 	ld a,(scrap+1)	; # of spaces to write
 	bit 7,a			; test if a is negative
-	jr nz,_
+	ret nz
 	ld b,a
+	ld de,(curRow)
+	ld (curRow),hl
+	ld hl,curRow
 eval_overwrite_tok_spaces:
+	ld a,(hl)
+	cp 8
+	jr nc,_
 	ld a,' '
 	bcall(_PutC)
 	djnz eval_overwrite_tok_spaces
-	
-_	pop hl
-	ld (curRow),hl	; restore cursor position
-	ld a,l
-	cp 8
-	jp nc,eval_scroll_down
+_	ld (curRow),de
 	ret
 
 
@@ -560,70 +557,9 @@ eval_scroll_down:
 	or a	; resets carry flag (nc)
 	ret z	; if row=0, abort
 	bcall(_ClrScrnFull)
-	ld hl,(curRow)
-	dec l
-	push hl
-	ld de,0
-	ld (curRow),de
-	sla l
-	sla l
-	sla l
-	sla l
-	ld a,h
-	add a,l	; a = (row-1)*16 + col + 16
-	push af
-	push af
-	ld hl,-inputBuffer
-	ld de,(inputBuffer_curP)
-	add hl,de
-	ex de,hl
-	call scantoklen_rev
-	pop af
-	sub b	; target - actual, if neg, then need to disp prev token
-	or a
-	jr z,_
-	;; display previous token partially on screen
-	ld b,a
-	push hl
-	ld a,(hl)	; a = partially displayed token
-	;call tok2titok
-	call tok2str
-	;; a is token legnth
-	ld a,b	
-	neg		; a = # of chars to exclude from token
-	ld d,0
-	ld e,a
-	ld a,(hl)
-	add a,b	; a = remaining chars in token string
-	add hl,de
-	call PutStrA
-	pop hl
-	inc hl
-	dec c	; decrease # of tokens to display	
-_
-	ld a,c
-	cpl
-	ld e,a
-	ld d,$FF
-	ld hl,(inputBuffer_curP)
-	inc de
-	add hl,de
-	ld b,0
-	call display_toks
-	pop bc	;; linear cursor offset from (0,0)
-	ld a,128
-	sub b
-	ld hl,(inputBuffer_curP)
-	ld de,(inputBuffer_offsetE)
-	call scantoklen_fwd
-	;; c = # of tokens to print
-	ld b,0
-	ld hl,(inputBuffer_curP)
-	ld a,c
-	or a
-	call nz,display_toks
-	pop hl
-	ld (curRow),hl
+	
+	ld hl,curRow
+	dec (hl)
+	call display_full
 	scf
 	ret
-	
