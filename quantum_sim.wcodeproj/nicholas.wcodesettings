@@ -75,7 +75,7 @@
 	</array>
 	<key>ProjectGroupsOutlineViewSelectedItemIndexPaths</key>
 	<array>
-		<string>0,7</string>
+		<string>0,0</string>
 	</array>
 	<key>ProjectGroupsOutlineViewWidth</key>
 	<real>125</real>
@@ -84,13 +84,14 @@
 		<string>evaluator.asm</string>
 		<string>util.asm</string>
 		<string>tables.asm</string>
-		<string>macros.inc</string>
 		<string>lexer.asm</string>
-		<string>Error.asm</string>
 		<string>parser.asm</string>
+		<string>quantum_sim.asm</string>
+		<string>lexer.inc</string>
+		<string>equates.inc</string>
 	</array>
 	<key>ProjectSelectedTextFileName</key>
-	<string>evaluator.asm</string>
+	<string>lexer.inc</string>
 	<key>ProjectSymbolsTableViewAutosaveDictionary</key>
 	<dict>
 		<key>Icon</key>
@@ -125,6 +126,6 @@
 	<key>ProjectSymbolsTableViewSortDescriptors</key>
 	<array/>
 	<key>ProjectWindowFrameKey</key>
-	<string>3 56 1440 821 0 0 1440 877 </string>
+	<string>0 56 1440 821 0 0 1440 877 </string>
 </dict>
 </plist>

@@ -6,6 +6,7 @@
 #include "ti83plus.inc"
 #include "app.inc"
 #include "macros.inc"
+#include "equates.inc"
 
 defpage(0)
 
@@ -77,5 +78,6 @@ PutKet_ints:
 	
 #include "evaluator.asm"
 #include "lexer.asm"
+#include "parser.asm"
 #include "util.asm"
 #include "Error.asm"
